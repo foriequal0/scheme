@@ -20,7 +20,6 @@ liftEnv x = EvalM $ lift x
 applyEnv :: Env -> EvalM a -> IOThrowsError a
 applyEnv env x = runReaderT (run x) env
 
--- FIXME: Add let
 eval :: LispVal -> EvalM LispVal
 eval val@(String _) = return val
 eval val@(Number _) = return val
@@ -49,11 +48,26 @@ eval (List (Atom "lambda" : varargs@(Atom _) : body)) =
     makeVarargs varargs [] body
 eval (List [Atom "load", String filename]) =
     (liftEnv $ load filename) >>= fmap last . mapM eval
+eval (List (Atom "let" : List bindings : body)) = do
+    (params, args) <- collectBindings bindings
+    func <- makeNormalFunc params body
+    applyEvalArgs func args
 eval (List (function : args)) = do
     func <- eval function
-    argVals <- mapM eval args
-    liftEnv $ apply func argVals
+    applyEvalArgs func args
 eval badForm = liftEnv $ throwError $ BadSpecialForm "Unrecognized special form" badForm
+
+collectBindings :: (MonadError LispError m) => [LispVal] -> m ([LispVal], [LispVal])
+collectBindings [] = return ([], [])
+collectBindings ((List [id@(_), valExpr]):xs) =
+    ((id, valExpr) `pairAppend`) <$> collectBindings xs
+  where (f, s) `pairAppend` (fx, sx) = (f:fx, s:sx)
+collectBindings (binding@(List form):_) =
+    throwError $ BadSpecialForm reason binding
+  where reason = if length form > 2
+                 then "Too many operands in let binding"
+                 else "Too few operands in let binding"
+collectBindings (x:_) = throwError $ BadSpecialForm "Malformed let" x
 
 apply :: LispVal -> [LispVal] -> IOThrowsError LispVal
 apply (PrimitiveFunc func) args = liftThrows $ func args
@@ -70,6 +84,11 @@ apply (Func params varargs body closure) args =
           bindVarArgs arg env = case arg of
               Just argName -> liftIO $ bindVars env [(argName, List $ remainingArgs)]
               Nothing -> return env
+
+applyEvalArgs :: LispVal -> [LispVal] -> EvalM LispVal
+applyEvalArgs func args = do
+    argVals <- mapM eval args
+    liftEnv $ apply func argVals
 
 primitives :: [(String, [LispVal] -> ThrowsError LispVal)]
 primitives = [("+", numericBinop (+)),
