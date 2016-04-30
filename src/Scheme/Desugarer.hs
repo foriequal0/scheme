@@ -4,5 +4,5 @@ module Scheme.Desugarer
 
 import Scheme.Types
 
-desugar :: LispVal -> LispVal
-desugar = id
+desugar :: LispVal -> ThrowsError LispVal
+desugar = return

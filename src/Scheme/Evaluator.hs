@@ -49,7 +49,7 @@ eval (List (Atom "lambda" : DottedList params varargs : body)) =
 eval (List (Atom "lambda" : varargs@(Atom _) : body)) =
     makeVarargs varargs [] body
 eval (List [Atom "load", String filename]) =
-    (load filename) >>= fmap last . mapM (eval . desugar)
+    (load filename) >>= (mapM $ liftThrows . desugar) >>= fmap last . mapM eval
 eval (List (function : args)) = do
     func <- eval function
     argVals <- mapM eval args
@@ -77,7 +77,7 @@ load filename = (liftIO $ readFile filename) >>= liftThrows . readExprList
 
 evalString :: Env -> String -> IO (Either LispError LispVal)
 evalString env expr =
-    let evalResult = (liftThrows $ readExpr expr) >>= eval . desugar :: EvalM LispVal
+    let evalResult = (liftThrows $ (readExpr expr >>= desugar)) >>= eval :: EvalM LispVal
     in
         runEvalM env evalResult
 
