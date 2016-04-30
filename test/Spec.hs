@@ -1,6 +1,8 @@
 module Main where
 
 import Scheme
+import Scheme.Desugarer
+import Scheme.Parser
 import Test.Hspec
 
 infix 1 `shouldReturnRight`
@@ -89,5 +91,39 @@ evalSpec =
       evalString env "(string<=? \"foo\" \"foo\")" `shouldReturnRight` Bool True
       evalString env "(string>=? \"foo\" \"foo\")" `shouldReturnRight` Bool True
 
+desugarSpec :: Spec
+desugarSpec =
+  describe "desugarer" $ do
+    let readAndDesugar str = readExpr str >>= desugar
+
+    it "desugars let" $ do
+      let infix 1 `shouldDesugaredInto`
+          sugared `shouldDesugaredInto` desugared =
+              (readAndDesugar sugared) `shouldBe` (readExpr desugared)
+
+      "(let ((x 1)) x)" `shouldDesugaredInto` "((lambda (x) x) 1)"
+      "(let ((x 1) (y 2)) (+ x y)))" `shouldDesugaredInto` "((lambda (x y) (+ x y)) 1 2)"
+      "(let ((x 1)) (print x) (+ x 1)))"
+          `shouldDesugaredInto` "((lambda (x) (print x) (+ x 1)) 1)"
+
+    it "throws on malformed let bindings" $ do
+      let anyLeft (Right _) = False
+          anyLeft (Left _) = True
+          shouldFailToDesugar str = readAndDesugar str `shouldSatisfy` anyLeft
+      shouldFailToDesugar "(let x x)"
+      shouldFailToDesugar "(let (x) x)"
+      shouldFailToDesugar "(let ((1 2)) 1)"
+      shouldFailToDesugar "(let ((x)) x)"
+      shouldFailToDesugar "(let ((x 1 2) x)"
+
+    it "does not desugar" $ do
+      let shouldNotDesugar sugared =
+              (readAndDesugar sugared) `shouldBe` (readExpr sugared)
+      shouldNotDesugar "(lambda (x y) (some x y))"
+      shouldNotDesugar "(define x 28)"
+      shouldNotDesugar "#t"
+      shouldNotDesugar "()"
+
 main = hspec $ do
   evalSpec
+  desugarSpec
