@@ -12,6 +12,7 @@ category:            Web
 build-type:          Simple
 -- extra-source-files:
 cabal-version:       >=1.10
+data-files:          lib/stdlib.scm
 
 library
   hs-source-dirs:      src
@@ -22,6 +23,7 @@ library
                        Language.Scheme.Parser
                        Language.Scheme.Primitives
                        Language.Scheme.Types
+  other-modules:       Paths_scheme
   build-depends:       array
                      , base >= 4.7 && < 5
                      , case-insensitive
