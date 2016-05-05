@@ -9,6 +9,7 @@ import System.Directory
 import System.FilePath
 import System.Environment
 
+import Paths_scheme
 import Language.Scheme
 
 until_ :: Monad m => (a -> Bool) -> m a -> (a -> m ()) -> m ()
@@ -42,8 +43,9 @@ replLoop = do
         Left  e     -> (outputStrLn . show) e
         Right exprs -> traverse_ (outputStrLn . show) exprs
 
-    loadStandardLibrary env =
-      evalLispVal env (List [Atom "load", String "lib/stdlib.scm"])
+    loadStandardLibrary env = do
+        stdLibPath <- getDataFileName "lib/stdlib.scm"
+        evalLispVal env (List [Atom "load", String stdLibPath])
 
 runRepl :: IO ()
 runRepl = do
