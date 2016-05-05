@@ -5,12 +5,15 @@ module Language.Scheme.Evaluator
   , evalString
   , newEnv
   , runOne
+  , withStandardLibrary
   ) where
 
 import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Reader
 import System.IO
+
+import Paths_scheme
 
 import Language.Scheme.Desugarer
 import Language.Scheme.Env
@@ -99,12 +102,22 @@ evalLispVal env = runExceptT . (evalLispVal' env)
 evalString :: Env -> String -> IO (Either LispError [LispVal])
 evalString env = runExceptT . (evalString' env)
 
--- FIXME: Load stdlib.scm before evaluating the program
 runOne :: [String] -> IO ()
 runOne args = do
     env <- newEnv >>= flip bindVars [("args", List $ map String $ drop 1 args)]
-    (runExceptT $ runEvalM env $ eval (List [Atom "load", String (args !! 0)]))
-         >>= hPutStrLn stderr . (either show show)
+    withStandardLibrary env $
+        (runExceptT $ runEvalM env $ eval (List [Atom "load", String (args !! 0)]))
+        >>= hPutStrLn stderr . (either show show)
+
+withStandardLibrary :: (MonadIO m) => Env -> m () -> m ()
+withStandardLibrary env action = do
+    res <- liftIO $ loadStandardLibrary env
+    case res of
+      Left e  -> liftIO $ putStrLn "Error loading stdlib"
+      Right _ -> action
+  where loadStandardLibrary env = do
+            stdlibPath <- getDataFileName "lib/stdlib.scm"
+            evalLispVal env (List [Atom "load", String stdlibPath])
 
 newEnv :: IO Env
 newEnv = primitiveBindings

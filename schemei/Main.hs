@@ -9,7 +9,6 @@ import System.Directory
 import System.FilePath
 import System.Environment
 
-import Paths_scheme
 import Language.Scheme
 
 until_ :: Monad m => (a -> Bool) -> m a -> (a -> m ()) -> m ()
@@ -28,10 +27,8 @@ schemeHistoryFile = do
 replLoop :: InputT IO ()
 replLoop = do
     env <- liftIO newEnv
-    res <- liftIO $ loadStandardLibrary env
-    case res of
-      Left e  -> liftIO $ putStrLn "Error loading stdlib"
-      Right _ -> until_ quitPred (getInputLine "Lisp>>> ") (evalAndPrint env . fromJust)
+    withStandardLibrary env $
+        until_ quitPred (getInputLine "Lisp>>> ") (evalAndPrint env . fromJust)
   where
     quitPred Nothing = True
     quitPred (Just "quit") = True
@@ -43,10 +40,6 @@ replLoop = do
         Left  e     -> (outputStrLn . show) e
         Right exprs -> traverse_ (outputStrLn . show) exprs
 
-    loadStandardLibrary env = do
-        stdLibPath <- getDataFileName "lib/stdlib.scm"
-        evalLispVal env (List [Atom "load", String stdLibPath])
-
 runRepl :: IO ()
 runRepl = do
   historyFile <- Just <$> schemeHistoryFile
@@ -56,4 +49,3 @@ runRepl = do
 main :: IO ()
 main = do args <- getArgs
           if null args then runRepl else runOne $ args
-

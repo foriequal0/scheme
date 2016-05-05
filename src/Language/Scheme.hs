@@ -5,6 +5,7 @@ module Language.Scheme
   , LispVal(..)
   , newEnv
   , runOne
+  , withStandardLibrary
   ) where
 
 import Language.Scheme.Evaluator
